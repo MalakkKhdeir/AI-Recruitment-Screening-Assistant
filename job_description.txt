@@ -1,0 +1,46 @@
+Job Title: Technical Project Manager
+
+We are looking for a Technical Project Manager to lead and coordinate technical projects from planning to completion.
+
+Responsibilities:
+- Plan, organize, and manage technical projects.
+- Define project scope, goals, deliverables, and timelines.
+- Coordinate between technical teams, developers, engineers, and stakeholders.
+- Track project progress, deadlines, and deliverables.
+- Identify project risks and help develop mitigation plans.
+- Communicate project status and updates to stakeholders.
+- Ensure projects are delivered on time and according to requirements.
+- Manage project documentation and maintain clear project records.
+- Support teams in solving technical and project-related issues.
+
+Required Skills:
+- Project management
+- Technical project management
+- Communication and leadership
+- Team coordination
+- Problem solving
+- Time management
+- Risk management
+- Agile and Scrum methodologies
+- Understanding of software development life cycle (SDLC)
+- Basic understanding of software and technology concepts
+- Microsoft Excel and project management tools
+
+Education:
+- Bachelor's degree or diploma in Computer Science, Software Engineering, Computer Engineering, Information Technology, AI, Robotics Engineering, or a related technical field.
+
+Experience:
+- Experience managing technical or software projects is preferred.
+- Experience working with cross-functional teams is a plus.
+- Academic or personal technical projects are acceptable for entry-level candidates.
+
+Preferred:
+- Experience with Jira, Trello, or similar project management tools.
+- Knowledge of Git and GitHub.
+- Familiarity with APIs, databases, cloud services, and software development workflows.
+- Experience with Agile/Scrum teams.
+- Strong documentation and reporting skills.
+
+Languages:
+- English
+- Arabic

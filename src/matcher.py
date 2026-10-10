@@ -53,7 +53,7 @@ Rules:
 - Do not make a final hiring decision.
 """
 
-    # Run Ollama
+    
     try:
         response = ollama.chat(
             model=MODEL,
@@ -73,10 +73,10 @@ Rules:
             "recommendation": "Not Evaluated"
         }
 
-    # Remove Markdown fences if present
+  
     raw_result = raw_result.replace("```json", "").replace("```", "").strip()
 
-    # Parse and validate JSON
+    
     try:
         result = json.loads(raw_result)
 
@@ -134,7 +134,7 @@ Rules:
             "recommendation": "Not Evaluated"
         }
 
-    # Prepare text for semantic similarity
+   
     required_skills = job.get("required_skills", [])
     if not isinstance(required_skills, list):
         required_skills = [required_skills]
@@ -155,7 +155,7 @@ Rules:
         elif value:
             candidate_information += " " + str(value)
 
-    # Avoid presenting similarity as proof of qualification
+   
     if not job_requirements.strip() or not candidate_information.strip():
         result["semantic_similarity"] = None
         result.setdefault(
@@ -257,7 +257,7 @@ def main():
             print(f"Error processing {cv_file.name}: {error}")
             continue
 
-    # Summary of all processed CVs
+    
     print("\n" + "=" * 55)
     print("===== ALL CANDIDATES SUMMARY =====")
     print("=" * 55)

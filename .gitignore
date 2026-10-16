@@ -1,12 +1,47 @@
+
+# Python
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets and environment variables
 .env
 .env.*
 !.env.example
+
+# Gmail OAuth credentials and tokens
 token.json
+client_secret*.json
 credentials.json
-client_secret_*.json
+
+# Candidate data and private CVs
 attachments/
+results.json
+
+# Local development
+.streamlit/secrets.toml
+
+
+# Local job and candidate data
+jobs.json
+results.json
+results_*.json
+processed_emails.json
 data/cvs/
-OllamaSetup.exe
+attachments/
+
+# Local installers
+*.exe
+
+# Python virtual environments and cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local backup files
+job_description_backup.txt
+
+# Local API test script
+test_openrouter.py

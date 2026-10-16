@@ -1,27 +1,54 @@
+
 import json
+import os
 import re
 from pathlib import Path
 
-import ollama
+from dotenv import load_dotenv
+from openai import OpenAI
 
-from cv_parser import extract_text
+from src.cv_parser import extract_text
 
 
-MODEL = "qwen3:8b"
+load_dotenv()
+
+MODEL = "openai/gpt-4o-mini"
+
+EMPTY_CANDIDATE = {
+    "name": "",
+    "email": "",
+    "phone": "",
+    "education": "",
+    "skills": [],
+    "experience": [],
+    "projects": [],
+}
+
+
+def get_openrouter_client():
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "OPENROUTER_API_KEY is missing. Check your .env file."
+        )
+
+    return OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
 
 
 def extract_candidate_info(cv_text):
+    if not isinstance(cv_text, str) or not cv_text.strip():
+        raise ValueError("CV text is empty.")
 
     prompt = f"""
 You are an AI recruitment assistant.
 
-Extract candidate information from the following CV.
+Extract candidate information from the CV below.
 
-Return ONLY valid JSON.
-Do not add explanations or markdown.
-
-Use exactly this structure:
-
+Return only one valid JSON object with exactly these fields:
 {{
     "name": "",
     "email": "",
@@ -33,12 +60,14 @@ Use exactly this structure:
 }}
 
 Rules:
-- Extract information only from the CV.
-- Do not invent missing information.
-- If information is not available, use an empty string or empty list.
-- Skills should be a list of skills.
-- Experience should be a list of relevant work/internship experiences.
-- Projects should be a list of projects.
+- Use only information explicitly supported by the CV.
+- Never invent missing information.
+- Use an empty string for missing text fields.
+- Use an empty list for missing list fields.
+- Skills must be a list of strings.
+- Experience and projects must be lists of strings.
+- Do not infer skills from a job title alone.
+- Return JSON only, without Markdown or explanations.
 
 CV:
 ----------------
@@ -46,64 +75,88 @@ CV:
 ----------------
 """
 
-    response = ollama.chat(
+    client = get_openrouter_client()
+
+    response = client.chat.completions.create(
         model=MODEL,
         messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "user", "content": prompt}
         ],
-        options={
-            "temperature": 0
-        }
+        temperature=0,
+        response_format={"type": "json_object"},
     )
 
-    result = response["message"]["content"].strip()
+    result = response.choices[0].message.content
 
-    
-    result = re.sub(r"```json\s*", "", result)
-    result = re.sub(r"```\s*", "", result)
+    if not result:
+        raise ValueError("OpenRouter returned an empty response.")
 
-    try:
-        candidate = json.loads(result)
-    except json.JSONDecodeError:
-        print("Could not parse Qwen response as JSON.")
-        print(result)
+    result = re.sub(
+        r"^\s*```(?:json)?\s*|\s*```\s*$",
+        "",
+        result.strip(),
+        flags=re.IGNORECASE,
+    )
 
-        candidate = {
-            "name": "",
-            "email": "",
-            "phone": "",
-            "education": "",
-            "skills": [],
-            "experience": [],
-            "projects": []
-        }
+    candidate = json.loads(result)
 
-    return candidate
+    if not isinstance(candidate, dict):
+        raise ValueError("Model response must be a JSON object.")
+
+    validated = {}
+
+    for field in ("name", "email", "phone", "education"):
+        value = candidate.get(field, "")
+        if not isinstance(value, str):
+            value = ""
+        validated[field] = value.strip()
+
+    for field in ("skills", "experience", "projects"):
+        value = candidate.get(field, [])
+        if not isinstance(value, list):
+            value = []
+
+        validated[field] = [
+            item.strip()
+            for item in value
+            if isinstance(item, str) and item.strip()
+        ]
+
+    return validated
 
 
 if __name__ == "__main__":
+    attachments_dir = Path("attachments")
 
-    pdf_files = list(Path("attachments").glob("*.pdf"))
+    files = sorted(
+        path
+        for path in attachments_dir.iterdir()
+        if path.is_file()
+        and path.suffix.lower() in {".pdf", ".docx"}
+    ) if attachments_dir.exists() else []
 
-    if not pdf_files:
-        print("No CV files found.")
-
+    if not files:
+        print("No CV files found in attachments.")
     else:
-        cv_file = pdf_files[0]
+        for cv_file in files:
+            print(f"\nProcessing: {cv_file.name}")
+            print("-" * 40)
 
-        print(f"Processing: {cv_file.name}")
+            try:
+                cv_text = extract_text(cv_file)
+                candidate = extract_candidate_info(cv_text)
 
-        cv_text = extract_text(cv_file)
+                print(json.dumps(
+                    candidate,
+                    indent=4,
+                    ensure_ascii=False,
+                ))
 
-        candidate = extract_candidate_info(cv_text)
+            except json.JSONDecodeError:
+                print("Error: OpenRouter returned invalid JSON.")
 
-        print("\n===== CANDIDATE INFORMATION =====")
-
-        print(json.dumps(
-            candidate,
-            indent=4,
-            ensure_ascii=False
-        ))
+            except Exception as exc:
+                print(
+                    f"Error processing {cv_file.name}: "
+                    f"{type(exc).__name__}: {exc}"
+                )

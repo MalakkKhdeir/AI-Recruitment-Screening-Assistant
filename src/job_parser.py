@@ -1,24 +1,50 @@
+
 import json
-import ollama
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+from openai import OpenAI
 
-MODEL = "qwen3:8b"
+
+load_dotenv()
+
+MODEL = "openai/gpt-4o-mini"
+
+EMPTY_JOB = {
+    "job_title": "",
+    "required_skills": [],
+    "preferred_skills": [],
+    "education": "",
+    "experience": "",
+    "responsibilities": [],
+}
+
+
+def get_openrouter_client():
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "OPENROUTER_API_KEY is missing. Check your .env file."
+        )
+
+    return OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
 
 
 def parse_job_description(job_text):
+    if not isinstance(job_text, str) or not job_text.strip():
+        raise ValueError("Job description is empty.")
 
     prompt = f"""
 You are an AI recruitment assistant.
 
-Analyze the following job description and extract the important
-requirements for candidate screening.
+Analyze the job description and extract screening requirements.
 
-Return ONLY valid JSON.
-Do not add explanations or markdown.
-
-Use exactly this structure:
-
+Return one valid JSON object with exactly these fields:
 {{
     "job_title": "",
     "required_skills": [],
@@ -29,81 +55,93 @@ Use exactly this structure:
 }}
 
 Rules:
-- Extract information only from the job description.
-- Do not invent missing information.
-- If information is not available, use an empty string or empty list.
-- required_skills should contain skills explicitly required for the job.
-- preferred_skills should contain skills that are preferred or considered a plus.
-- responsibilities should contain the main responsibilities of the position.
+- Use only information supported by the job description.
+- Never invent missing requirements.
+- Use an empty string for missing text fields.
+- Use an empty list for missing list fields.
+- required_skills must contain explicitly mandatory skills.
+- preferred_skills must contain preferred or optional skills.
+- Never move a preferred skill into required_skills.
+- Keep responsibilities as a list of strings.
+- Return JSON only, without Markdown or explanations.
 
-Job Description:
+Job description:
 ----------------
 {job_text}
 ----------------
 """
 
-    response = ollama.chat(
+    client = get_openrouter_client()
+
+    response = client.chat.completions.create(
         model=MODEL,
         messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "user", "content": prompt}
         ],
-        options={
-            "temperature": 0
-        }
+        temperature=0,
+        response_format={"type": "json_object"},
     )
 
-    result = response["message"]["content"].strip()
+    result = response.choices[0].message.content
 
-    # Remove markdown code fences if Qwen adds them
-    result = result.replace("```json", "")
-    result = result.replace("```", "")
-    result = result.strip()
+    if not result:
+        raise ValueError("OpenRouter returned an empty response.")
 
-    try:
-        job = json.loads(result)
+    job = json.loads(result)
 
-    except json.JSONDecodeError:
-        print("Could not parse Qwen response as JSON.")
-        print(result)
+    if not isinstance(job, dict):
+        raise ValueError("Model response must be a JSON object.")
 
-        job = {
-            "job_title": "",
-            "required_skills": [],
-            "preferred_skills": [],
-            "education": "",
-            "experience": "",
-            "responsibilities": []
-        }
+    validated = {}
 
-    return job
+    for field in ("job_title", "education", "experience"):
+        value = job.get(field, "")
+        validated[field] = (
+            value.strip() if isinstance(value, str) else ""
+        )
+
+    for field in (
+        "required_skills",
+        "preferred_skills",
+        "responsibilities",
+    ):
+        value = job.get(field, [])
+
+        if not isinstance(value, list):
+            value = []
+
+        validated[field] = [
+            item.strip()
+            for item in value
+            if isinstance(item, str) and item.strip()
+        ]
+
+    return validated
 
 
 if __name__ == "__main__":
-
     job_file = Path("job_description.txt")
 
-    if not job_file.exists():
-        print("Job description file not found.")
+    if not job_file.is_file():
+        print(f"Job description file not found: {job_file}")
 
     else:
+        try:
+            job_text = job_file.read_text(encoding="utf-8")
 
-        job_text = job_file.read_text(
-            encoding="utf-8"
-        )
+            print(f"Processing: {job_file.name}")
 
-        print(f"Processing: {job_file.name}")
+            job = parse_job_description(job_text)
 
-        job = parse_job_description(job_text)
-
-        print("\n===== JOB INFORMATION =====")
-
-        print(
-            json.dumps(
+            print("\n===== JOB INFORMATION =====")
+            print(json.dumps(
                 job,
                 indent=4,
-                ensure_ascii=False
-            )
-        )
+                ensure_ascii=False,
+            ))
+
+        except json.JSONDecodeError:
+            print("Error: OpenRouter returned invalid JSON.")
+
+        except Exception as exc:
+            print(f"Error: {type(exc).__name__}: {exc}")

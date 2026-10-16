@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 
 
-
 from src.candidate_extractor import extract_candidate_info, get_openrouter_client
 
 from src.cv_parser import extract_text
@@ -17,9 +16,6 @@ from src.job_parser import parse_job_description
 from src.semantic_matcher import calculate_semantic_similarity
 
 
-
-
-
 MODEL = "openai/gpt-4o-mini"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,15 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ATTACHMENTS_DIR = BASE_DIR / "attachments"
 
 
-
 JOB_FILE = BASE_DIR / "job_description.txt"
 JOBS_FILE = BASE_DIR / "jobs.json"
 RESULTS_FILE = BASE_DIR / "results.json"
-
-
-
-
-
 
 
 STATUSES = {"Meets", "Partially Meets", "Does Not Meet"}
@@ -45,9 +35,6 @@ NO_EVIDENCE = "No evidence found in the provided candidate information."
 SEMANTIC_REVIEW_THRESHOLD = 55.0
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
-
-
-
 
 
 def normalize_text(value):
@@ -61,17 +48,11 @@ def normalize_text(value):
     return " ".join(value.split())
 
 
-
-
-
 def normalize_email(value):
 
     """Return a normalized email address, or an empty string."""
 
     return value.strip().casefold() if isinstance(value, str) else ""
-
-
-
 
 
 def get_requirements(job):
@@ -107,7 +88,6 @@ def get_requirements(job):
                 })
 
 
-
     for field in ("education", "experience", "languages", "certifications"):
 
         value = job.get(field, "")
@@ -127,7 +107,6 @@ def get_requirements(job):
                 })
 
 
-
     unique, seen = [], set()
 
     for item in requirements:
@@ -141,9 +120,6 @@ def get_requirements(job):
             unique.append(item)
 
     return unique
-
-
-
 
 
 def candidate_values(candidate):
@@ -171,9 +147,6 @@ def candidate_values(candidate):
     return result
 
 
-
-
-
 def candidate_text(candidate):
 
     """Combine extracted candidate information into text."""
@@ -187,9 +160,6 @@ def candidate_text(candidate):
         for value in field_values
 
     )
-
-
-
 
 
 def get_relevant_candidate_info(requirement, req_type, candidate):
@@ -225,9 +195,6 @@ def get_relevant_candidate_info(requirement, req_type, candidate):
     )
 
 
-
-
-
 def find_explicit_evidence(requirement, candidate, cv_text=""):
 
     """
@@ -243,7 +210,6 @@ def find_explicit_evidence(requirement, candidate, cv_text=""):
     req = normalize_text(requirement)
 
 
-
     # Exact normalized match in a structured candidate field.
 
     for field_values in values.values():
@@ -253,7 +219,6 @@ def find_explicit_evidence(requirement, candidate, cv_text=""):
             if normalize_text(value) == req:
 
                 return value
-
 
 
     # Explicit component checks for compound requirements.
@@ -305,7 +270,6 @@ def find_explicit_evidence(requirement, candidate, cv_text=""):
                 return "; ".join(values.get("skills", []))
 
 
-
     # Multiword requirement explicitly contained in a structured CV entry.
 
     for field_values in values.values():
@@ -317,7 +281,6 @@ def find_explicit_evidence(requirement, candidate, cv_text=""):
             if len(req.split()) >= 2 and req in normalized_value:
 
                 return value
-
 
 
     # Only return a quote from the original CV when it contains the key terms
@@ -351,11 +314,7 @@ def find_explicit_evidence(requirement, candidate, cv_text=""):
                 return line.strip()[:400] or None
 
 
-
     return None
-
-
-
 
 
 def verify_evidence(evidence, cv_text, candidate):
@@ -373,13 +332,11 @@ def verify_evidence(evidence, cv_text, candidate):
         return None
 
 
-
     normalized_evidence = normalize_text(evidence)
 
     if not normalized_evidence:
 
         return None
-
 
 
     sources = [cv_text, candidate_text(candidate)]
@@ -391,9 +348,6 @@ def verify_evidence(evidence, cv_text, candidate):
             return evidence
 
     return None
-
-
-
 
 
 def calculate_match(candidate, job, cv_text=None):
@@ -427,13 +381,11 @@ def calculate_match(candidate, job, cv_text=None):
     }
 
 
-
     if not requirements:
 
         result["concerns"].append("No job requirements were extracted.")
 
         return result
-
 
 
     if not structured_text.strip() and not original_cv_text.strip():
@@ -453,7 +405,6 @@ def calculate_match(candidate, job, cv_text=None):
         return result
 
 
-
     prompt = f"""
 
 You are an AI recruitment screening assistant. Evaluate every requirement
@@ -461,11 +412,9 @@ You are an AI recruitment screening assistant. Evaluate every requirement
 separately using only the candidate's CV.
 
 
-
 Extracted candidate information:
 
 {json.dumps(candidate, ensure_ascii=False)}
-
 
 
 Original CV text:
@@ -473,11 +422,9 @@ Original CV text:
 {original_cv_text}
 
 
-
 Requirements:
 
 {json.dumps(requirements, ensure_ascii=False)}
-
 
 
 Return one JSON object with:
@@ -507,7 +454,6 @@ Return one JSON object with:
 }}
 
 
-
 Rules:
 
 - Return one item for every supplied requirement.
@@ -533,7 +479,6 @@ Rules:
 - matching_experience and concerns must be lists of strings.
 
 """
-
 
 
     try:
@@ -565,13 +510,11 @@ Rules:
             raise ValueError("Expected a JSON object.")
 
 
-
         analyses = data.get("requirements_analysis", [])
 
         if not isinstance(analyses, list):
 
             raise ValueError("Invalid requirements_analysis.")
-
 
 
         lookup = {}
@@ -597,7 +540,6 @@ Rules:
             lookup[key] = item
 
 
-
         for req in requirements:
 
             key = (
@@ -615,7 +557,6 @@ Rules:
             if proposed_status not in STATUSES:
 
                 proposed_status = "Does Not Meet"
-
 
 
             # First verify the model's quote, then look for explicit evidence
@@ -639,7 +580,6 @@ Rules:
                 evidence = explicit_evidence
 
 
-
             # Critical fix: a model's "Meets" status cannot stand if there is
 
             # no traceable evidence. Similarity never changes this status.
@@ -661,7 +601,6 @@ Rules:
                 # Explicit evidence exists, but model judged it insufficient.
 
                 status = "Partially Meets"
-
 
 
             relevant_info = get_relevant_candidate_info(
@@ -693,7 +632,6 @@ Rules:
                     similarity = None
 
 
-
             semantic_review = (
 
                 evidence is None
@@ -719,7 +657,6 @@ Rules:
             })
 
 
-
         matching_experience = data.get("matching_experience", [])
 
         concerns = data.get("concerns", [])
@@ -731,7 +668,6 @@ Rules:
         )
 
         result["concerns"] = concerns if isinstance(concerns, list) else []
-
 
 
         mandatory = [
@@ -775,7 +711,6 @@ Rules:
         ]
 
 
-
         similarities = [
 
             item["semantic_similarity"]
@@ -795,7 +730,6 @@ Rules:
             )
 
 
-
         score = result["match_score"]
 
         result["recommendation"] = (
@@ -809,7 +743,6 @@ Rules:
             else "Weak Match"
 
         )
-
 
 
         if result["missing_skills"]:
@@ -855,7 +788,6 @@ Rules:
             )
 
 
-
     except Exception as error:
 
         result["concerns"].append(
@@ -865,11 +797,7 @@ Rules:
         )
 
 
-
     return result
-
-
-
 
 
 def load_saved_results():
@@ -895,9 +823,6 @@ def load_saved_results():
         raise RuntimeError(f"Could not read saved results: {error}") from error
 
 
-
-
-
 def save_results(results):
 
     """Atomically persist results to JSON."""
@@ -913,15 +838,9 @@ def save_results(results):
     temporary_file.replace(RESULTS_FILE)
 
 
-
-
-
 def get_job_fingerprint(job_text):
 
     return hashlib.sha256(job_text.encode("utf-8")).hexdigest()
-
-
-
 
 
 def load_job_by_id(job_id):
@@ -937,17 +856,14 @@ def load_job_by_id(job_id):
         )
 
 
-
     with JOBS_FILE.open("r", encoding="utf-8") as file:
 
         jobs = json.load(file)
 
 
-
     if not isinstance(jobs, list):
 
         raise ValueError("jobs.json must contain a JSON list.")
-
 
 
     for job in jobs:
@@ -957,11 +873,7 @@ def load_job_by_id(job_id):
             return job
 
 
-
     raise ValueError(f"No job found with ID: {job_id}")
-
-
-
 
 
 def main(job_id=None):
@@ -971,7 +883,6 @@ def main(job_id=None):
         print(f"Attachments directory not found: {ATTACHMENTS_DIR}")
 
         return
-
 
 
     try:
@@ -991,15 +902,12 @@ def main(job_id=None):
                 return
 
 
-
             job_text = JOB_FILE.read_text(encoding="utf-8")
 
             job = parse_job_description(job_text)
 
 
-
         job_fingerprint = get_job_fingerprint(job_text)
-
 
 
     except Exception as error:
@@ -1007,7 +915,6 @@ def main(job_id=None):
         print(f"Could not load job description: {error}")
 
         return
-
 
 
     try:
@@ -1049,7 +956,6 @@ def main(job_id=None):
     seen_file_hashes = set()
 
 
-
     for file in files:
 
         print(f"\nProcessing: {file.name}")
@@ -1065,7 +971,6 @@ def main(job_id=None):
                 continue
 
             seen_file_hashes.add(file_hash)
-
 
 
             cv_text = extract_text(file)
@@ -1085,7 +990,6 @@ def main(job_id=None):
                 continue
 
 
-
             email = normalize_email(candidate.get("email", ""))
 
             if email and email in results_by_email:
@@ -1099,7 +1003,6 @@ def main(job_id=None):
                 print("Duplicate candidate email; attached file to existing record.")
 
                 continue
-
 
 
             if email and email in existing_by_email:
@@ -1127,7 +1030,6 @@ def main(job_id=None):
                 print("Candidate already screened for this job; reusing saved result.")
 
                 continue
-
 
 
             result = calculate_match(candidate, job, cv_text=cv_text)
@@ -1163,9 +1065,7 @@ def main(job_id=None):
                 results_without_email.append(result)
 
 
-
             print(json.dumps(result, indent=2, ensure_ascii=False))
-
 
 
         except Exception as error:
@@ -1174,6 +1074,10 @@ def main(job_id=None):
 
             continue
 
+
+    print("\n" + "=" * 55)
+    print("===== ALL CANDIDATES SUMMARY =====")
+    print("=" * 55)
 
 
     results = list(results_by_email.values()) + results_without_email
@@ -1189,7 +1093,6 @@ def main(job_id=None):
         item.get("name", "").casefold(),
 
     ))
-
 
 
     def belongs_to_current_job(item):
@@ -1218,7 +1121,6 @@ def main(job_id=None):
         return
 
 
-
     print("\n===== CANDIDATES SUMMARY =====")
 
     for item in results:
@@ -1241,9 +1143,6 @@ def main(job_id=None):
         f"\nSaved {len(results)} candidate record(s) for this job. "
         f"Total saved records across jobs: {len(results_to_save)} in {RESULTS_FILE}"
     )
-
-
-
 
 
 if __name__ == "__main__":
